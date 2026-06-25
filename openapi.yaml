@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Payment Service Synchronous API
+  description: Специфікація синхронного REST API для мікросервісу обробки платежів (Payment Service)
+  version: 1.0.0
+paths:
+  /v1/payments:
+    post:
+      summary: Ініціалізувати новий платіж
+      description: Приймає платіжні реквізити від Order Service або клієнта та запускає транзакцію через Stripe.
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платіж успішно оброблено платіжним шлюзом
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Некоректні вхідні дані (помилка валідації)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Платіж відхилено (наприклад, недостатньо коштів на картці)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '500':
+          description: Внутрішня помилка сервера або збій на стороні Stripe API
+
+components:
+  schemas:
+    PaymentRequest:
+      type: object
+      required:
+        - order_id
+        - amount
+        - currency
+        - payment_token
+      properties:
+        order_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+          description: "Унікальний ідентифікатор замовлення з Order Service"
+        amount:
+          type: number
+          format: float
+          example: 2500.50
+          description: "Сума платежу"
+        currency:
+          type: string
+          example: "UAH"
+          enum: [UAH, USD, EUR]
+          description: "Валюта операції"
+        payment_token:
+          type: string
+          example: "tok_visa"
+          description: "Безпечний одноразовий токен карти, згенерований Stripe SDK на фронтенді"
+
+    PaymentResponse:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        order_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        status:
+          type: string
+          example: "SUCCESS"
+          enum: [PENDING, SUCCESS, FAILED, REFUNDED]
+        charge_id:
+          type: string
+          example: "ch_3MvY8lFvX9x0..."
+          description: "Ідентифікатор транзакції у зовнішній системі Stripe"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-25T21:30:00Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error_code:
+          type: string
+          example: "VALIDATION_FAILED"
+        message:
+          type: string
+          example: "Поле payment_token є обов'язковим для заповнення"

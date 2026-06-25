@@ -1,0 +1,53 @@
+@startuml
+title Domain Data Model (ERD) - Payment Service
+
+hide circle
+skinparam linetype ortho
+
+entity "User" as user {
+  * user_id : UUID [PK]
+  --
+  * email : VARCHAR(100)
+  * name : VARCHAR(100)
+}
+
+entity "PaymentMethod" as payment_method {
+  * payment_method_id : UUID [PK]
+  --
+  * user_id : UUID [FK]
+  * type : VARCHAR(20)
+  * provider : VARCHAR(50)
+  * last_four : VARCHAR(4)
+  * is_default : BOOLEAN
+  * created_at : TIMESTAMP
+}
+
+entity "Payment" as payment {
+  * payment_id : UUID [PK]
+  --
+  * order_id : UUID
+  * user_id : UUID [FK]
+  * payment_method_id : UUID [FK]
+  * amount : DECIMAL(10,2)
+  * currency : VARCHAR(3)
+  * status : VARCHAR(20)
+  * created_at : TIMESTAMP
+  * updated_at : TIMESTAMP
+}
+
+entity "TransactionLog" as tx_log {
+  * log_id : UUID [PK]
+  --
+  * payment_id : UUID [FK]
+  * external_tx_id : VARCHAR(100)
+  * operation_type : VARCHAR(30)
+  * raw_response : TEXT
+  * created_at : TIMESTAMP
+}
+
+user ||--o{ payment_method : "володіє"
+user ||--o{ payment : "здійснює"
+payment_method ||--o{ payment : "використовується для"
+payment ||--o{ tx_log : "генерує лог"
+
+@enduml

@@ -1,0 +1,68 @@
+@startuml
+title Behaviors of the Component - Payment Service Sequence
+
+autonumber
+
+actor "Користувач / Клієнт" as User
+
+box "Зовнішні системи" #F0F4F8
+    participant "Order Service" as Order
+    participant "Stripe API" as Stripe
+end box
+
+box "Payment Service (Внутрішні компоненти)" #EBF8FF
+    participant "Payment Controller" as Controller
+    participant "Payment Manager / Service" as Manager
+    participant "Payment Repository" as Repo
+    participant "Event Publisher" as Event
+end box
+
+User -> Order : Натискає "Оплатити замовлення"
+Order -> Controller : Ініціювати платіж\n[POST /v1/payments]
+activate Controller
+
+Controller -> Manager : processPayment()
+activate Manager
+
+Manager -> Repo : saveInitialTransaction()
+activate Repo
+Repo -> Repo : Статус 'PENDING'
+Manager <-- Repo : transaction_id
+deactivate Repo
+
+Manager -> Stripe : Виклик еквайрингу\n[POST /v1/charges]
+activate Stripe
+Manager <-- Stripe : Відповідь (200 OK)
+deactivate Stripe
+
+alt Успішна оплата
+    Manager -> Repo : updateStatus('SUCCESS')
+    activate Repo
+    deactivate Repo
+    
+    Manager -> Event : sendPaymentConfirmed()
+    activate Event
+    Event -> Order : Подія Kafka (PaymentConfirmed)
+    deactivate Event
+    
+    Controller <-- Manager : Результат: Успішно
+else Помилка оплати
+    Manager -> Repo : updateStatus('FAILED')
+    activate Repo
+    deactivate Repo
+    
+    Manager -> Event : sendPaymentFailed()
+    activate Event
+    Event -> Order : Подія Kafka (PaymentFailed)
+    deactivate Event
+    
+    Controller <-- Manager : Результат: Помилка
+end
+
+deactivate Manager
+
+Order <-- Controller : HTTP Response
+deactivate Controller
+
+Order --> User : Відображення результату
+@enduml

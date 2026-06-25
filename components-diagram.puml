@@ -1,0 +1,34 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Component Diagram for Payment Service (C4 Level 3)
+
+Container(api_gateway, "API Gateway", "Spring Cloud / Nginx", "Маршрутизує та фільтрує зовнішні HTTP-запити від клієнтів")
+Container(order_service, "Order Service", "Python / FastAPI", "Керує замовленнями, покупками та відстежує їхні статуси")
+ContainerDb(db_payment, "Payment Database", "PostgreSQL", "Зберігає фінансові транзакції, лог платежів та стани операцій")
+System_Ext(stripe, "Stripe API", "Зовнішній платіжний шлюз для безпечної обробки кредитних карток")
+
+Container_Boundary(payment_service, "Payment Service") {
+    Component(controller, "Payment Controller", "MVC Rest Controller", "Приймає вхідні запити на ініціалізацію оплат та повернення коштів, валідує DTO")
+    Component(manager, "Payment Manager / Service", "Business Logic Layer", "Ядро сервісу. Обробляє бізнес-правила платежів, координує процеси та керує станами")
+    Component(repository, "Payment Repository", "Data Access Object", "Забезпечує збереження, зчитування та оновлення фінансових даних у БД")
+    Component(stripe_client, "Stripe Gateway Client", "HTTP Client Adaptor", "Реалізує патерн Адаптер для ізоляції логіки роботи з API Stripe")
+    Component(event_publisher, "Event Publisher", "Message Queue Client", "Асинхронно відправляє події про зміну фінансових статусів у брокер")
+}
+
+Rel(api_gateway, controller, "Перенаправляє запити користувачів", "HTTP/JSON")
+Rel(order_service, controller, "Ініціює оплату створеного замовлення", "gRPC / HTTP")
+
+Rel(controller, manager, "Передає валідовані дані для обробки", "In-Process")
+Rel(manager, repository, "Створює/оновлює запис трансакції (Pending/Success)", "In-Process")
+Rel(repository, db_payment, "Виконує SQL-запити (Insert/Update)", "SQL")
+
+Rel(manager, stripe_client, "Передає платіжний токен для списання", "In-Process")
+Rel(stripe_client, stripe, "Викликає сервіс еквайрингу", "HTTPS/REST")
+
+Rel(manager, event_publisher, "Формує подію результату трансакції", "In-Process")
+Rel(event_publisher, order_service, "Надсилає подію PaymentConfirmed / PaymentFailed", "Kafka / RabbitMQ")
+
+@enduml
